@@ -322,8 +322,16 @@ async def benchmark(
             extra_body=extra_body,
             multi_modal_content=test_mm_content,
         )
-        profile_output = await request_func(request_func_input=profile_input,
+        profiling_session = aiohttp.ClientSession(
+            trust_env=True,
+            timeout=AIOHTTP_TIMEOUT,
+            connector=aiohttp.TCPConnector(limit=0,
+                                           limit_per_host=0,
+                                           force_close=True))
+        profile_output = await request_func(session=profiling_session,
+                                            request_func_input=profile_input,
                                             streaming=streaming)
+        await profiling_session.close()
         if profile_output.success:
             print("Profiler started")
 
@@ -348,15 +356,15 @@ async def benchmark(
     async def limited_request_func(request_func_input, streaming, pbar,
                                    session):
         if semaphore is None:
-            return await request_func(request_func_input=request_func_input,
+            return await request_func(session=session,
+                                      request_func_input=request_func_input,
                                       streaming=streaming,
-                                      pbar=pbar,
-                                      session=session)
+                                      pbar=pbar)
         async with semaphore:
-            return await request_func(request_func_input=request_func_input,
+            return await request_func(session=session,
+                                      request_func_input=request_func_input,
                                       streaming=streaming,
-                                      pbar=pbar,
-                                      session=session)
+                                      pbar=pbar)
 
     benchmark_start_time = time.perf_counter()
     tasks: list[asyncio.Task] = []
